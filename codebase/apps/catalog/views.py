@@ -22,6 +22,7 @@ class ProductListView(APIView):
                 Q(name__icontains=search)
                 | Q(description__icontains=search)
                 | Q(sku__icontains=search)
+                | Q(salts__name__icontains=search)
             )
 
         category_id = request.query_params.get("category")
@@ -49,6 +50,10 @@ class ProductListView(APIView):
         in_stock = request.query_params.get("in_stock")
         if in_stock and str(in_stock).lower() in ("true", "1", "yes"):
             queryset = queryset.filter(stock_quantity__gt=0)
+        strength = request.query_params.get("strength", "").strip()
+        if strength:
+            queryset = queryset.filter(strength__icontains=strength)
+        queryset = queryset.distinct()
 
         # Pagination
         page_size = min(int(request.query_params.get("page_size", 20)), 100)
@@ -83,6 +88,31 @@ class ProductDetailView(APIView):
 
         serializer = ProductDetailSerializer(product)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class ProductSubstituteView(APIView):
+    """Get substitute medicines by same salt(s) and strength with stock."""
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, pk):
+        try:
+            product = Product.objects.prefetch_related("salts").get(pk=pk)
+        except Product.DoesNotExist:
+            return Response({"message": "Product not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        salt_ids = list(product.salts.values_list("id", flat=True))
+        if not salt_ids:
+            return Response({"count": 0, "results": []}, status=status.HTTP_200_OK)
+
+        substitutes = (
+            Product.objects.filter(salts__id__in=salt_ids, stock_quantity__gt=0, is_active=True)
+            .exclude(pk=product.pk)
+            .filter(strength=product.strength)
+            .select_related("category", "company")
+            .distinct()
+        )
+        serializer = ProductListSerializer(substitutes, many=True)
+        return Response({"count": len(serializer.data), "results": serializer.data}, status=status.HTTP_200_OK)
 
 
 class CategoryListView(APIView):

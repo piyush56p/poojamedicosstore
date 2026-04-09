@@ -1,10 +1,16 @@
+import os
+import uuid
 from django.db import models
 from django.conf import settings
 
 
 def user_prescription_path(instance, filename):
-    # media/users/<user_id>/prescriptions/<filename>
-    return f"users/{instance.user.id}/prescriptions/{filename}"
+    # media/users/<user_id>/prescriptions/prescription_<unique>.ext
+    ext = os.path.splitext(filename)[1].lower() or ".jpeg"
+    if ext not in (".jpg", ".jpeg", ".png", ".webp"):
+        ext = ".jpeg"
+    unique = uuid.uuid4().hex[:12]
+    return f"users/{instance.user.id}/prescriptions/prescription_{unique}{ext}"
 
 
 class Prescription(models.Model):
