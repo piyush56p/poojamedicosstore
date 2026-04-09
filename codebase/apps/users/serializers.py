@@ -3,8 +3,9 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth import authenticate
 from django.contrib.auth.hashers import make_password
 
-
 User = get_user_model()
+from apps.catalog.models import Product
+from .models import UserAddress, UserIllness, UserNote, UserRoutineMedicine
 
 
 class SignupSerializer(serializers.ModelSerializer):
@@ -87,4 +88,54 @@ class ProfileSerializer(serializers.ModelSerializer):
             "is_email_verified",
             "date_joined",
         ]
-        read_only_fields = fields
+        read_only_fields = ["id", "username", "role", "is_mobile_verified", "is_email_verified", "date_joined"]
+
+
+class UserAddressSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserAddress
+        fields = [
+            "id",
+            "label",
+            "address_line",
+            "city",
+            "state",
+            "pincode",
+            "is_default",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+
+# ----- User detail (profile + related) -----
+class UserIllnessSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserIllness
+        fields = ["id", "name", "description", "created_at", "updated_at"]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class UserNoteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserNote
+        fields = ["id", "title", "content", "created_at", "updated_at"]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class UserRoutineMedicineSerializer(serializers.ModelSerializer):
+    product_id = serializers.PrimaryKeyRelatedField(
+        queryset=Product.objects.filter(is_active=True), source="product", write_only=True
+    )
+    product_name = serializers.CharField(source="product.name", read_only=True)
+    product_price = serializers.DecimalField(
+        source="product.price", max_digits=10, decimal_places=2, read_only=True
+    )
+
+    class Meta:
+        model = UserRoutineMedicine
+        fields = [
+            "id", "product", "product_id", "product_name", "product_price",
+            "quantity", "frequency", "notes", "created_at", "updated_at",
+        ]
+        read_only_fields = ["id", "product", "product_name", "product_price", "created_at", "updated_at"]
